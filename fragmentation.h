@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 #include <cmath> 
+#include <cilk/cilk.h>
+#include <cilk/cilk_api.h>
+#include <cilk/reducer_vector.h>
+#include <cilk/cilk_api.h>
 
 typedef std::pair< std::vector<double>, std::vector<double> > min_max_vectors;
 typedef std::pair<Box, Box> boxes_pair;
