@@ -1,13 +1,9 @@
 #include "fragmentation.h"
 
-/// вектор, содержащий box-ы, являющиеся частью рабочего пространства
-std::vector<Box> solution;
-/// вектор, содержащий box-ы, не являющиеся частью рабочего пространства
-std::vector<Box> not_solution;
-/// вектор, содержащий box-ы, находящиеся на границе между "рабочим" и "нерабочим" пространством
-std::vector<Box> boundary;
-/// вектор, хранящий box-ы, анализируемые на следующей итерации алгоритма
-std::vector<Box> temporary_boxes;
+cilk::reducer<cilk::op_vector<Box>>solution; 
+cilk::reducer<cilk::op_vector<Box>>not_solution;
+cilk::reducer<cilk::op_vector<Box>>boundary;
+cilk::reducer<cilk::op_vector<Box>>temporary_boxes;
 
 
 /// функции gj()
@@ -157,16 +153,16 @@ void low_level_fragmentation::GetBoxType(const Box& box)
 	number = ClasifyBox(vecs);
 
 	if (number == 0) // shit
-		not_solution.push_back(box);
+		not_solution->push_back(box);
 	if (number == 1) // work
-		solution.push_back(box);
+		solution->push_back(box);
 	if (number == 2) { // split
 		GetNewBoxes(box, pair);
-		temporary_boxes.push_back(pair.first);
-		temporary_boxes.push_back(pair.second);
+		temporary_boxes->push_back(pair.first);
+		temporary_boxes->push_back(pair.second);
 	}
 	if (number == 3) // boundary
-		boundary.push_back(box);
+		boundary->push_back(box);
 }
 
 
@@ -263,10 +259,15 @@ void high_level_analysis::GetSolution()
 	temporary_boxes.push_back(current_box);
 
 	for (int i = 0; i < length; i++) {
-		int number_of_box_on_level = temporary_boxes.size();
-		std::vector<Box> curr_boxes(temporary_boxes);
-		temporary_boxes.clear();
-		for (int j = 0; j < number_of_box_on_level; j++){
+		std::vector<Box> temp;
+		temporary_boxes.move_out(temp);
+		int number_of_box_on_level = temp.size();
+		//cilk::reducer<cilk::op_vector<Box>>curr_boxes;
+		//curr_boxes.move_in(temp);
+		std::vector<Box> curr_boxes(temp);
+		temp.clear();
+		temporary_boxes.set_value(temp);
+		cilk_for (int j = 0; j < number_of_box_on_level; j++){ // ВВЕСТИ СЮДА ПАРАЛЛЕЛИЗМ
 			GetBoxType(curr_boxes[j]);
 		}
 	}
@@ -280,22 +281,28 @@ void WriteResults( const char* file_names[] )
 	// необходимо определить функцию
 	double _xmin, _xmax, _w, _h;
 	std::ofstream out(file_names[0]);
-	for (int i = 0; i < solution.size(); i++){
-		solution[i].GetParameters(_xmin, _xmax, _w, _h);
+	std::vector<Box>sol_tmp;
+	solution.move_out(sol_tmp);
+	for (int i = 0; i < sol_tmp.size(); i++){
+		sol_tmp[i].GetParameters(_xmin, _xmax, _w, _h);
 		out << _xmin << " " << _xmax << " " << _w << " " << _h << std::endl;
 	}
 	out.close();
 
+	std::vector<Box>nsol_tmp;
+	not_solution.move_out(nsol_tmp);
 	std::ofstream out1(file_names[1]);
-	for (int i = 0; i < not_solution.size(); i++){
-		not_solution[i].GetParameters(_xmin, _xmax, _w, _h);
+	for (int i = 0; i < nsol_tmp.size(); i++){
+		nsol_tmp[i].GetParameters(_xmin, _xmax, _w, _h);
 		out1 << _xmin << " " << _xmax << " " << _w << " " << _h << std::endl;
 	}
 	out1.close();
 
+	std::vector<Box>bnd_tmp;
+	boundary.move_out(bnd_tmp);
 	std::ofstream out2(file_names[2]);
-	for (int i = 0; i < boundary.size(); i++){
-		boundary[i].GetParameters(_xmin, _xmax, _w, _h);
+	for (int i = 0; i < bnd_tmp.size(); i++){
+		bnd_tmp[i].GetParameters(_xmin, _xmax, _w, _h);
 		out2 << _xmin << " " << _xmax << " " << _w << " " << _h << std::endl;
 	}
 	out2.close();
