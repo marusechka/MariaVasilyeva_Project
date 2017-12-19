@@ -22,13 +22,14 @@ int main()
 	setlocale(LC_ALL,"Rus");
 		
 	//double a = -10, b = 0, c = 24, d = 16;
+	double left = -g_l1_max, top = 0, width = g_l1_max + g_l0 + g_l2_max, height = std:: min(g_l2_max, g_l1_max);
 	
 	high_resolution_clock::time_point t1, t2;
 	__cilkrts_end_cilk();
 	__cilkrts_set_param("nworkers", "4");
 	
 	t1 = high_resolution_clock::now(); //засекли время
-	high_level_analysis main_object(-g_l1_max,0,g_l1_max+g_l0+g_l2_max,g_l2_max);
+	high_level_analysis main_object(left, top, width, height);
 		
 	main_object.GetSolution();
 
